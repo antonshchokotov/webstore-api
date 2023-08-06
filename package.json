@@ -5,7 +5,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node --watch index.js"
+    "start": "node --watch index.js",
+    "build": "docker build . -t webstore/api",
+    "deploy": "docker run -p 3060:3060 -d webstore/api --name webstore-api"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
