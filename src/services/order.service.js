@@ -10,16 +10,23 @@ async function createOrder({
   deliveryAddress,
 }) {
   try {
-    const { reservedProducts, unavailableProductIds } =
+    const { reservedProducts, unavailableProducts } =
       await productRepository.reserveProducts({
         productIdsToCountMap,
       });
 
-    if (unavailableProductIds) {
+    if (unavailableProducts) {
+      const unavailableProductIdsToCountMap = unavailableProducts.reduce(
+        (acc, product) => {
+          acc[product.id] = product.count;
+          return acc;
+        },
+        {}
+      );
       return {
         status: "Failed",
         error: ERROR_MESSAGES.PRODUCTS_UNAVAILABLE,
-        unavailableProductIds,
+        unavailableProducts: unavailableProductIdsToCountMap,
       };
     }
 
@@ -39,14 +46,14 @@ async function createOrder({
     const { id: orderId } = await orderRepository.createOrder(orderData);
 
     //? PAYMENT SYSTEM integration is not defined, assuming it will generate a link in return to provided id and price
-    const paymentLink = `https://payment.system/webstore/${orderId}`;
+    orderData.paymentLink = `https://payment.system/webstore/${orderId}`;
 
     await orderRepository.changeOrderStatus({
       id: orderId,
       status: ORDER_STATUSES.PENDING,
     });
 
-    return { status: "Success", orderId, ...orderData, paymentLink };
+    return { status: "Success", orderId, ...orderData };
   } catch (error) {
     console.log(`Error in order.service createOrder ${error.message}`);
     throw error;

@@ -16,21 +16,30 @@ async function reserveProducts({ productIdsToCountMap }) {
   session.startTransaction();
 
   try {
-    const unavailableProductIds = [];
+    const unavailableProducts = [];
     const reservedProducts = [];
 
     await Promise.all(
       Object.entries(productIdsToCountMap).map(async ([productId, count]) => {
         if (!mongoose.isValidObjectId(productId)) {
-          unavailableProductIds.push(productId);
+          unavailableProducts.push({ id: productId, count });
           return;
         }
         const product = await Product.findOne({ _id: productId }, null, {
           session,
         });
 
-        if (!product || product.quantity < product.reserved + count) {
-          unavailableProductIds.push(productId);
+        if (!product) {
+          unavailableProducts.push({ id: productId, count });
+          return;
+        }
+
+        const availableProductsCount = product.quantity - product.reserved;
+        if (availableProductsCount < count) {
+          unavailableProducts.push({
+            id: productId,
+            count: count - availableProductsCount,
+          });
           return;
         }
 
@@ -42,9 +51,9 @@ async function reserveProducts({ productIdsToCountMap }) {
       })
     );
 
-    if (unavailableProductIds.length) {
+    if (Object.keys(unavailableProducts).length) {
       await session.abortTransaction();
-      return { unavailableProductIds };
+      return { unavailableProducts };
     }
 
     await session.commitTransaction();
